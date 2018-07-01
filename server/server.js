@@ -1,69 +1,41 @@
-
 const path = require('path');
 const http = require('http');
 const express = require('express');
 const socketIO = require('socket.io');
 
+const {generateMessage, generateLocationMessage} = require('./utils/message');
+
+
 const publicPath = path.join(__dirname, '../public');
 const port = process.env.PORT || 3000;
-console.log(__dirname + '/../public');//server old way
-console.log(publicPath);
-
 var app = express();
 var server = http.createServer(app);
-//app.listen already calls this behind the scene
-
 var io = socketIO(server);
 
 app.use(express.static(publicPath));
 
 io.on('connection', (socket) => {
-	console.log('New user connected');
+  console.log('New user connected');
 
+  socket.emit('newMessage', generateMessage('Admin', 'Welcome to the chat app'));
 
-	socket.emit('newMessage', {
-		from: 'John',
-		text: 'See you then',
-		createAt: 123123
-	});
+  socket.broadcast.emit('newMessage', generateMessage('Admin', 'New user joined'));
 
-	//socket.emit from Admin text Welcome to the chat app
-	socket.emit('newMessage', {
-		from: 'Admin',
-		text: 'Welcome to the chap app'
-	});
+  socket.on('createMessage', (message, callback) => {
+    console.log('createMessage', message);
+    io.emit('newMessage', generateMessage(message.from, message.text));
+    callback();
+  });
 
+  socket.on('createLocationMessage', (coords)=>{
+  	io.emit('newLocationMessage', generateLocationMessage('Admin', coords.latitude,coords.longitude));
+  });
 
-	//socket.broadcase.emit from Admin text New user joined
-	socket.broadcast.emit('newMessage',{
-		from: 'Admin',
-		text: 'New user joined',
-		createAt: new Date().getTime()
-	});
-
-	//Listener
-	socket.on('createMessage', (message)=>{
-		console.log('createMessage', message);
-		io.emit('newMessage', {
-			from:message.from,
-			text:message.text,
-			createAt: new Date().getTime()
-		});
-		//Who it gets send to except the person
-		// socket.broadcase.emit('newMessage', {
-		// 	from:message.from,
-		// 	text:message.text,
-		// 	createAt: new Date().getTime()
-		// });
-
-
-	});
-
-	socket.on('disconnect', () => {
-		console.log('User was disconnect');
-	});
+  socket.on('disconnect', () => {
+    console.log('User was disconnected');
+  });
 });
 
 server.listen(port, () => {
-	console.log(`Server is up on ${port}`);
+  console.log(`Server is up on ${port}`);
 });
